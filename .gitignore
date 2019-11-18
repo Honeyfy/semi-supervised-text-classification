@@ -1,0 +1,45 @@
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+
+# Cache
+.cache
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# DotEnv configuration
+.env
+
+# Database
+*.db
+*.rdb
+
+# Pycharm
+.idea
+
+# Jupyter NB Checkpoints
+.ipynb_checkpoints/
+
+
+# Exclude data from source control by default
+/data/
+# Include gitkeep for folder placeholders
+!/data/*/.gitkeep
+!.gitkeep
+!/data/README.md
