@@ -19,4 +19,9 @@ def remove_meta_lines(text):
     new_lines = [lines[i] for i in indexes]
     return "\n".join(new_lines)
 
+def textDf_2_tokens(data,pattern):
+    data['text'] = data['text'].str.split(pattern, expand=False)
+    data = data.explode('text').reset_index(drop=True)
+    return data
+
 

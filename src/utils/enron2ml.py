@@ -47,7 +47,7 @@ subfolders = [f.path for f in os.scandir(enron_folder) if f.is_dir() ]
 
 outfile = open(filename_out, 'w', newline='')
 writer = csv.writer(outfile, delimiter=',')
-writer.writerow(["index", "document_id", "text", "user_id", "label_id"])
+writer.writerow(["", "document_id", "text", "user_id", "label_id"])
 
 user_id = "3" # dummy value for output csv
 file_counter = 1
