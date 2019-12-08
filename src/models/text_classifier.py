@@ -305,7 +305,7 @@ def run_model_on_file(input_filename, output_filename, user_id, project_id, labe
                                   'use_idf': True, 'smooth_idf': True,
                                   'min_df': 2, 'max_df': .9, 'binary': True, 'ngram_range': ngram_range,
                                   'stop_words': 'english', 'strip_accents': 'ascii', 'max_features': 5000}),
-                ('drop columns', {'drop_cols': ['label_id', 'text', 'processed_text']})]
+                ('drop columns', {'drop_cols': ['label_id', 'text', 'processed_text', 'index']})]
 
     result = clf.run_on_file(input_filename, output_filename, user_id, project_id, label_id,
                              pipeline=pipeline, run_on_entire_dataset=run_on_entire_dataset)
@@ -316,7 +316,7 @@ if __name__ == '__main__':
 
     data_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, 'data'))
 
-    input_file = os.path.join(data_path, 'ml_input.csv')
+    input_file = os.path.join(data_path, r'enron_with_categories/enron_ml_1.csv')
     output_file = os.path.join(data_path, 'output.csv')
 
     result = run_model_on_file(
