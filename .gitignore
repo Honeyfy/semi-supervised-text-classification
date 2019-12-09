@@ -43,3 +43,4 @@ target/
 !/data/*/.gitkeep
 !.gitkeep
 !/data/README.md
+/my_stuff
