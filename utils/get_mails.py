@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from my_stuff.clean_n_split import clean_n_split
+from utils.clean_n_split import clean_n_split
 
 def get_rand_mail(all_par_data,mails_num):
     documents = np.unique(all_par_data['document_id'])

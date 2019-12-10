@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 from src.models.text_classifier import run_model_on_file
 from src.models.text_classifier import TextClassifier
-from my_stuff import get_conf_labels as get_conf_labels
-from my_stuff.get_mails import get_rand_mail
+from utils import get_conf_labels as get_conf_labels
+from utils.get_mails import get_rand_mail
 # data_path = r'C:\develop\code\semi-supervised-text-classification\data'
 # model_path = r'C:\develop\code\semi-supervised-text-classification\data\results\ml_model_'
 # all_par_data = pd.read_csv(r'C:\develop\code\semi-supervised-text-classification\data\expand_samp_enron_no_head.csv')

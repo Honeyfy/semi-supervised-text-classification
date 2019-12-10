@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 
 from src.models.text_classifier import run_model_on_file
 from src.models.text_classifier import TextClassifier
-from my_stuff import get_conf_labels as get_conf_labels
-from my_stuff.bootstrap import my_bootstrap
-from my_stuff.get_pars_data import get_par_data
+from utils import get_conf_labels as get_conf_labels
+from utils.bootstrap import my_bootstrap
+from utils.get_pars_data import get_par_data
 
 
-from my_stuff.clean_n_split import clean_n_split
+from utils.clean_n_split import clean_n_split
 
 
 def par_runner(all_par_data,data_path,model_path,mails_num,min_confidence,model_name,user_id):
