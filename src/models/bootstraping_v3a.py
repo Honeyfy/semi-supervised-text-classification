@@ -7,14 +7,12 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.utils import shuffle
-from sklearn.model_selection import train_test_split
-
 
 def print_evaluation_scores(y, y_pred):
     precision = precision_score(y, y_pred)
     recall = recall_score(y, y_pred)
     f1 = f1_score(y, y_pred)
-    print("# # # # # # # # # # # # # # # # # # # #\n"
+    print("# # # # # # # # # MODEL SCORES ON EXTERNAL TEST DATA # # # # # # # # # # #\n"
           " precision :{}   recall :{}    f1 :{}   on Test file".format(precision, recall, f1))
 
 def load_data(filename):
@@ -63,6 +61,10 @@ def get_paragraphs_0_labels(paragraphs):
     paragraphs0 = paragraphs[paragraphs['label_id'] == 0]
     return paragraphs0
 
+def get_texts_0_labels(texts):
+    texts_0 = texts[texts['label_id'] == 0]
+    return texts_0
+
 def get_paragraphs_1_labels(paragraphs):
     paragraphs1 = paragraphs[paragraphs['label_id'] == 1]
     return paragraphs1
@@ -102,28 +104,40 @@ def new_data_count(predictions_of_1_high_conf, paragraphs0, train_set_for_1_labe
     print("Number of full mails with label 1: {}".format(n3))
     print("Total: {}".format(n1 + n2 + n3))
 
-def bootstraping(filename, new_data_file, model_id, confidence_limit):
-    print('loading ', filename)
+def count_labels(data_frame_with_labels):
+    label_count_1 = data_frame_with_labels.loc[data_frame_with_labels['label_id'] == 1]
+    label_count_0 = data_frame_with_labels.loc[data_frame_with_labels['label_id'] == 0]
+    print ("{} 1 labels in data. {} 0 labels in data".format(len(label_count_1), len(label_count_0)))
+
+def bootstraping(filename, new_data_file, model_id, confidence_limit = 0.9, train_on_paragraphs = True):
+    print('loading data set with full emails ', filename)
     data = load_data(filename)
+    count_labels(data)
     print('parsing {} texts to paragraphs'.format(len(data)))
     paragraphs = textDf_2_tokens(data)
-    print('getting predictions for {} paragraphs'.format(len(paragraphs)))
-    paragraphs_with_prediction = predict_paragraphs(paragraphs, model_id)
+    count_labels(paragraphs)
+    # predict only from 1 labeled texts
+    paragraphs1 = get_paragraphs_1_labels(paragraphs)
+    print('getting predictions for the {} paragraphs that came from texts originally labeled 1'.format(len(paragraphs1)))
+    paragraphs_with_prediction = predict_paragraphs(paragraphs1, model_id)
     paragraphs1 = get_paragraphs_1_labels(paragraphs_with_prediction)
-    print("{} paragraphs came from texts originally labeled as 1".format(len(paragraphs1)))
     predictions_of_1_high_conf = get_paragraphs_predicted_1_with_high_conf(paragraphs1, confidence_limit)
     print("number of paragraphs predicted 1 with {} confidence is {}".format(confidence_limit,
                                                                              len(predictions_of_1_high_conf)))
     # predictions_of_1_high_conf = get_conf_labels(model_id, paragraphs1, confidence_limit, 0)
     train_set_for_1_labels = get_train_set_for_1_labels(data, predictions_of_1_high_conf)
     print("number of texts in bootstraped dataset labeled 1 is {} ".format(len(train_set_for_1_labels)))
-    paragraphs0 = get_paragraphs_0_labels(paragraphs)
-    print("number of texts in bootstraped dataset labeled 0 is {} ".format(len(paragraphs0)))
-    new_data = create_new_dataset(train_set_for_1_labels, paragraphs0)
-    new_data_count(predictions_of_1_high_conf, paragraphs0, train_set_for_1_labels)
+    if train_on_paragraphs == True:
+        train_set_for_0_labels = get_paragraphs_0_labels(paragraphs)
+    if train_on_paragraphs == False:
+        train_set_for_0_labels = get_texts_0_labels(data)
+    print("number of texts in bootstraped dataset labeled 0 is {} ".format(len(train_set_for_0_labels)))
+    new_data = create_new_dataset(train_set_for_1_labels, train_set_for_0_labels)
+    new_data_count(predictions_of_1_high_conf, train_set_for_0_labels, train_set_for_1_labels)
     save_new_data(new_data, new_data_file)
 
 def run_model_on_texts(file_path, project_id):
+    print ("run model on full texts to create classifier")
     data_path = os.path.abspath(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, 'data'))
     input_file = os.path.join(data_path, file_path)
@@ -145,7 +159,7 @@ def load_model_from_file(model_id):
 
 if __name__ == '__main__':
     data_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, 'data'))
-    full_texts_filename = '\enron_ml_1_clean_no_index.csv'
+    full_texts_filename = '\enron_with_categories\enron_cat11_single_clean.csv'
     model_id = '0016'
     new_data_file = 'new_data_0016b.csv'
     # create train and test files
@@ -162,8 +176,9 @@ if __name__ == '__main__':
     predictions = model_clf.predict(pre_processed).astype(int)
     print_evaluation_scores(test_df['label_id'], predictions)
     # bootstrap data
-    confidence_limit = 0.8
-    bootstraping(data_path + r"\train_set", new_data_file, model_id, confidence_limit)
+    confidence_limit = 0.9
+    train_on_paragraphs = True
+    bootstraping(data_path + r"\train_set", new_data_file, model_id, confidence_limit,train_on_paragraphs)
     # train model on bootsrap data
     run_model_on_texts(new_data_file, str(int(model_id) + 1))
     print("model saved with id {}".format(str(int(model_id) + 1)))
