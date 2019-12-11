@@ -1,41 +1,44 @@
-import numpy as np
 import pandas as pd
-import spacy
 from googletrans import Translator
 
-
-def print_ents(spacy_obj):
-    for token in spacy_obj:
-        print(token.text, token.pos_, token.dep_)
-
 def translate(origin, src, dest):
-    origin_list = [origin] if isinstance(origin, str) else origin
     translator = Translator()
-    translates_obj = translator.translate(origin_list, src=src, dest=dest)
-    translates_list = list(map(lambda x: x.text, translates_obj))
-    return translates_list
+    translates_obj = translator.translate(origin, src=src, dest=dest)
+    return translates_obj.text
 
-def translate_to_fr(origin):
-    return translate
+def back_trans_enfr(origin):
+    origin_fr = translate(origin, 'en', 'fr')
+    return translate(origin_fr, 'fr', 'en')
 
-def create_origins_list(full_dataset,max_char):
-    origin_list = []
+def back_trans_enhe(origin):
+    origin_fr = translate(origin, 'en', 'he')
+    return translate(origin_fr, 'he', 'en')
+
+def back_trans_envi(origin):
+    origin_fr = translate(origin, 'en', 'vi')
+    return translate(origin_fr, 'vi', 'en')
+
+def create_translation_list(origin):
+    origin_list = [origin]
+    origin_list.append(back_trans_enfr(origin))
+    origin_list.append(back_trans_enhe(origin))
+    origin_list.append(back_trans_envi(origin))
     return origin_list
+
+# def create_translation_list_test(origin): #for when api is down
+#     origin_list = [origin]
+#     origin_list.append("1"+origin)
+#     origin_list.append("2"+origin)
+#     return origin_list
+
+def get_data_augmentations_via_backtranslation(data_frame): #augment text in column ['text']
+    data_frame['text'] = [create_translation_list(x) for x in data_frame['text']]
+    return_df = data_frame.explode('text').reset_index(drop= True)
+    return_df = return_df.sample(frac=1)
+    return return_df
+
 if __name__ == '__main__':
-    hotels_df = pd.read_csv(r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\ml_input_labeled.csv')
-    hotels_df['char_count'] = hotels_df['text'].str.len()
-    print(hotels_df['char_count'].sum())
-    text_example0 = hotels_df['text'][0]
-    text_example1 = hotels_df['text'][1]
-
-    a = translate([text_example0, text_example1], 'en', 'es')
-    b = translate(hotels_df['text'][:10].tolist(), 'en', 'es')
-    nlp = spacy.load('en_core_web_sm')
-    spacy_example0 = nlp(text_example0)
-    spacy_example1 = nlp(text_example1)
-
-    print(text_example0)
-    print_ents(spacy_example0)
-    translator = Translator()
-    translated_obj = translator.translate([text_example0, text_example1], dest='fr')
-    translates_arr = list(map(lambda x: x.text, translated_obj))
+    read_csv = pd.read_csv(r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\ml_input_labeled.csv')
+    read_csv = read_csv[:10]
+    augmented_dataset = get_data_augmentations_via_backtranslation(read_csv)
+    export_csv = augmented_dataset.to_csv(r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\ml_augmented.csv', index = False, header=True)
