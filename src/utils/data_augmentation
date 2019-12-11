@@ -1,0 +1,41 @@
+import numpy as np
+import pandas as pd
+import spacy
+from googletrans import Translator
+
+
+def print_ents(spacy_obj):
+    for token in spacy_obj:
+        print(token.text, token.pos_, token.dep_)
+
+def translate(origin, src, dest):
+    origin_list = [origin] if isinstance(origin, str) else origin
+    translator = Translator()
+    translates_obj = translator.translate(origin_list, src=src, dest=dest)
+    translates_list = list(map(lambda x: x.text, translates_obj))
+    return translates_list
+
+def translate_to_fr(origin):
+    return translate
+
+def create_origins_list(full_dataset,max_char):
+    origin_list = []
+    return origin_list
+if __name__ == '__main__':
+    hotels_df = pd.read_csv(r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\ml_input_labeled.csv')
+    hotels_df['char_count'] = hotels_df['text'].str.len()
+    print(hotels_df['char_count'].sum())
+    text_example0 = hotels_df['text'][0]
+    text_example1 = hotels_df['text'][1]
+
+    a = translate([text_example0, text_example1], 'en', 'es')
+    b = translate(hotels_df['text'][:10].tolist(), 'en', 'es')
+    nlp = spacy.load('en_core_web_sm')
+    spacy_example0 = nlp(text_example0)
+    spacy_example1 = nlp(text_example1)
+
+    print(text_example0)
+    print_ents(spacy_example0)
+    translator = Translator()
+    translated_obj = translator.translate([text_example0, text_example1], dest='fr')
+    translates_arr = list(map(lambda x: x.text, translated_obj))
