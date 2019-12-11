@@ -1,3 +1,15 @@
+'''
+Code for transfering labels from full mails to paragraphs labels.
+A new dataset is generated.
+Inputs: trained model id, data file name, and new data file name for saving the new data
+All paragraphs from mails with labels 0 automatically labeled as 0.
+All paragraphs predicted as 1 with confidence above threshold from the given trained model labeled as 1.
+All full mails, with lables 1, which did not have paragraphs which were labeled with high confidence,
+are added to the new dataset as well.
+
+This project is collaboration of Roi Ruach, Ran Dan, Amir Gal-Or and Shira Weissman.
+'''
+
 import pandas as pd
 import numpy as np
 import os
@@ -12,6 +24,7 @@ def load_data(filename):
     return data
 
 def textDf_2_tokens(data):
+    # Spliting text to paragraphs separated with two lines in the full text
     pattern = '\n\n'
     data['text'] = data['text'].str.split(pattern, expand=False)
     paragraphs = data.explode('text').reset_index(drop=True)
@@ -34,10 +47,12 @@ def predict_paragraphs(paragraphs, model_id):
 
 def get_pargarphs_predicted_1_with_high_conf(dataframe, confidence):
     predictions_from_1_docs = dataframe.loc[dataframe['label_id'] == 1]
-    predictions_of_1 = predictions_from_1_docs.loc[predictions_from_1_docs['prediction'] == '1']
+    predictions_of_1 = predictions_from_1_docs.loc[predictions_from_1_docs['prediction'] == 1]
     predictions_of_1_high_conf = predictions_of_1.loc[predictions_of_1['confidence'] > confidence]
     return predictions_of_1_high_conf
 
+# Another function for getting paragraphs with labels 1 with high confidence
+# eventually was not used.
 def get_conf_labels(model_id, par_text_df, min_confidence, user_id, include_zeros=False):
     one_string = ''       #TODO what hapens when b<1?
     data_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, 'data'))
@@ -67,9 +82,9 @@ def get_conf_labels(model_id, par_text_df, min_confidence, user_id, include_zero
     return new_labels_df
 
 def get_train_set_for_1_labels(full_texts_df,pargarphs_predicted_1_with_high_conf):
+    # Getting the full mails with labels 1 which their paragraphs were not classified with high confidence.
     labeled_1_full_texts_not_in_par_pred = full_texts_df.loc[~full_texts_df['document_id'].isin(pargarphs_predicted_1_with_high_conf['document_id'])]
-    train_set_for_1_labels = pd.concat((labeled_1_full_texts_not_in_par_pred,pargarphs_predicted_1_with_high_conf), axis=0)
-    return train_set_for_1_labels
+    return labeled_1_full_texts_not_in_par_pred
 
 def get_paragraphs_0_labels(pargarphs):
     pargarphs0 = pargarphs[pargarphs['label_id']==0]
@@ -80,17 +95,14 @@ def get_paragraphs_1_labels(pargarphs):
     return pargarphs1
 
 def create_new_dataset(predictions_of_1_high_conf, train_set_for_1_labels, pargarphs0):
-    # predictions_of_1_high_conf = predictions_of_1_high_conf.drop(['prediction', 'confidence'], axis=1)
-    predictions_of_1_high_conf.reset_index(drop=True, inplace=True)
+    predictions_of_1_high_conf = predictions_of_1_high_conf[['document_id', 'text', 'user_id', 'label_id']]
 
-    # train_set_for_1_labels = train_set_for_1_labels.drop(['prediction', 'confidence'], axis=1)
-    train_set_for_1_labels.reset_index(drop=True, inplace=True)
+    train_set_for_1_labels = train_set_for_1_labels[['document_id', 'text', 'user_id', 'label_id']]
 
-    pargarphs0.reset_index(drop=True, inplace=True)
-
-    new_data = pd.concat([predictions_of_1_high_conf, train_set_for_1_labels, pargarphs0], axis=0)
+    new_data = pd.concat([predictions_of_1_high_conf, train_set_for_1_labels, pargarphs0], axis=0, sort=False)
     from sklearn.utils import shuffle
     new_data = shuffle(new_data)
+    new_data = new_data[['document_id', 'text', 'user_id', 'label_id']]
     return new_data
 
 def predict_mails_from_paragraphs(paragraphs_with_prediction):
@@ -103,6 +115,7 @@ def predict_mails_from_paragraphs(paragraphs_with_prediction):
     return mails_results
 
 def evaluate_results(mails_results, model_id):
+    print("Evaluation report for classifying full mails from paragraphs predictions with model {}:".format(model_id))
     data_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, 'data'))
     model_file = 'results\ml_model_' + str(model_id) + '.pickle'
     model_path = data_path + '\\' + model_file
@@ -136,9 +149,10 @@ def bootstraping(filename, new_data_file, model_id):
     paragraphs = textDf_2_tokens(data)
     paragraphs_with_prediction = predict_paragraphs(paragraphs, model_id)
 
-    paragraphs1 = get_paragraphs_1_labels(paragraphs)
-    # predictions_of_1_high_conf = get_pargarphs_predicted_1_with_high_conf(paragraphs_with_prediction, 0.5)
-    predictions_of_1_high_conf = get_conf_labels(model_id, paragraphs1, 0.9, 0)
+    mails_results = predict_mails_from_paragraphs(paragraphs_with_prediction)
+    evaluation_result_str = evaluate_results(mails_results, model_id)
+
+    predictions_of_1_high_conf = get_pargarphs_predicted_1_with_high_conf(paragraphs_with_prediction, 0.9)
     train_set_for_1_labels = get_train_set_for_1_labels(data, predictions_of_1_high_conf)
     paragraphs0 = get_paragraphs_0_labels(paragraphs)
     new_data = create_new_dataset(predictions_of_1_high_conf, train_set_for_1_labels, paragraphs0)
@@ -147,15 +161,14 @@ def bootstraping(filename, new_data_file, model_id):
 
     save_new_data(new_data, new_data_file)
 
-    mails_results = predict_mails_from_paragraphs(paragraphs_with_prediction)
-    evaluation_result_str = evaluate_results(mails_results, model_id)
+
 
 
 if __name__ == '__main__':
-    filename = 'enron_ml_1_clean_shuffled_no_index2.csv'
-    new_data_file = 'new_data_0016b.csv'
+    filename ='new_data_0030_roy.csv' #'enron_ml_1_clean_shuffled_no_index2.csv'
+    new_data_file = 'new_data_0035_roy.csv'
 
-    model_id = '0016'
+    model_id = '0035'
 
     bootstraping(filename, new_data_file, model_id)
 
