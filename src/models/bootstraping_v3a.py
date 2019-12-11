@@ -71,8 +71,8 @@ def get_paragraphs_1_labels(paragraphs):
 
 def create_new_dataset(train_set_for_1_labels, paragraphs0):
     # train_set_for_1_labels = train_set_for_1_labels.drop(['prediction', 'confidence'], axis=1)
-    train_set_for_1_labels.reset_index(drop=True, inplace=True)
-    paragraphs0.reset_index(drop=True, inplace=True)
+    # train_set_for_1_labels.reset_index(drop=True, inplace=True)
+    # paragraphs0.reset_index(drop=True, inplace=True)
     new_data = pd.concat([train_set_for_1_labels, paragraphs0], axis=0, sort=True)
     new_data = shuffle(new_data)
     new_data = new_data[['document_id', 'text', 'user_id', 'label_id']]
@@ -85,13 +85,14 @@ def save_new_data(new_data, new_data_file):
         new_data.to_csv(f, index=False)
 
 def predict_mails_from_paragraphs(paragraphs_with_prediction):
+    paragraphs_with_prediction['prediction'] = paragraphs_with_prediction['prediction'].astype(int)
     mails_predictions = paragraphs_with_prediction.groupby(['document_id'])['prediction'].sum()
     mails_predictions[mails_predictions > 0] = 1
     mails_predictions.reset_index(drop=True, inplace=True)
     mails_ids = pd.DataFrame(np.unique(paragraphs_with_prediction[['document_id', 'label_id']], axis=0), columns=['document_id', 'label_id'])
     mails_ids.reset_index(drop=True, inplace=True)
-    mails_results = pd.concat([mails_ids, mails_predictions], axis=1)
-    return mails_results
+    mails_ids.insert(0, 'prediction', mails_predictions)
+    return mails_ids
 
 def new_data_count(predictions_of_1_high_conf, paragraphs0, train_set_for_1_labels):
     n1 = len(predictions_of_1_high_conf)
@@ -159,12 +160,16 @@ def load_model_from_file(model_id):
 
 if __name__ == '__main__':
     data_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, 'data'))
+    #path for file with full text to train model on
     full_texts_filename = '\enron_with_categories\enron_cat11_single_clean.csv'
-    model_id = '0016'
-    new_data_file = 'new_data_0016b.csv'
+    model_id = '0010'
+    new_data_file = 'new_data_0010b.csv'
+    #choose confidence limit to give pargraphs label 1
+    confidence_limit = 0.9
+    train_on_paragraphs = True # True: 0 labeled text are paragraphs
     # create train and test files
     full_texts_df = pd.read_csv(data_path + full_texts_filename)
-    train_df = full_texts_df.sample(frac=0.8, random_state=0)
+    train_df = full_texts_df.sample(frac=0.9, random_state=0)
     test_df = full_texts_df.loc[~full_texts_df['document_id'].isin(train_df['document_id'])]
     # save train_df
     export_csv = train_df.to_csv(data_path + r"\train_set", index=False, header=True)
@@ -176,14 +181,31 @@ if __name__ == '__main__':
     predictions = model_clf.predict(pre_processed).astype(int)
     print_evaluation_scores(test_df['label_id'], predictions)
     # bootstrap data
-    confidence_limit = 0.9
-    train_on_paragraphs = True
     bootstraping(data_path + r"\train_set", new_data_file, model_id, confidence_limit,train_on_paragraphs)
     # train model on bootsrap data
     run_model_on_texts(new_data_file, str(int(model_id) + 1))
     print("model saved with id {}".format(str(int(model_id) + 1)))
+    ##################### validation on test file ####################
     # get scores for test file
+    print ("scores on data of full texts")
     model_clf = load_model_from_file(str(int(model_id) + 1))
     pre_processed = model_clf.pre_process(test_df, fit=False)
     predictions = model_clf.predict(pre_processed).astype(int)
+    predictions_df = model_clf.get_prediction_df(pre_processed)
     print_evaluation_scores(test_df['label_id'], predictions)
+    print("scores on data of paragraphed texts")
+    paragraphed_test_text_df = textDf_2_tokens(test_df)
+    paragraphed_pre_processed = model_clf.pre_process(paragraphed_test_text_df, fit=False)
+    paragraphed_predictions = model_clf.predict(paragraphed_pre_processed).astype(int)
+    paragraphed_predictions_df = model_clf.get_prediction_df(paragraphed_pre_processed)
+    paragraphed_predictions_df.insert(0, 'document_id', paragraphed_test_text_df['document_id'])
+    paragraphed_predictions_df.insert(0, 'label_id', paragraphed_test_text_df['label_id'])
+    print("scores on pargraphs from test data")
+    print_evaluation_scores(paragraphed_predictions_df['label_id'], paragraphed_predictions)
+    predicted_by_mail = predict_mails_from_paragraphs(paragraphed_predictions_df)
+    print("scores on mails predicted from paragraphs  on test data")
+    print_evaluation_scores(test_df['label_id'], predicted_by_mail['prediction'])
+
+
+
+
