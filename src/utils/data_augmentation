@@ -32,8 +32,10 @@ def create_translation_list(origin):
 #     return origin_list
 
 def get_data_augmentations_via_backtranslation(data_frame): #augment text in column ['text']
-    data_frame['text'] = [create_translation_list(x) for x in data_frame['text']]
+    return_df = data_frame.copy(deep=True)
+    return_df['text'] = [create_translation_list(x) for x in data_frame['text']]
     return_df = data_frame.explode('text').reset_index(drop= True)
+    #shuffle dataset before return
     return_df = return_df.sample(frac=1)
     return return_df
 
