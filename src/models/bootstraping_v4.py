@@ -7,7 +7,7 @@ All paragraphs predicted as 1 with confidence above threshold from the given tra
 All full mails, with lables 1, which did not have paragraphs which were labeled with high confidence,
 are added to the new dataset as well.
 
-This project is collaboration of Roi Ruach, Ran Dan, Amir Gal-Or and Shira Weissman.
+This project is collaboration of Roi Ruach, Ran Dan, Amir Hamenahem and Shira Weissman.
 '''
 
 import pandas as pd
