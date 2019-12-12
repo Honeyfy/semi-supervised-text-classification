@@ -39,6 +39,6 @@ def get_data_augmentations_via_backtranslation(data_frame): #augment text in col
 
 if __name__ == '__main__':
     read_csv = pd.read_csv(r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\ml_input_labeled.csv')
-    read_csv = read_csv[:10]
-    augmented_dataset = get_data_augmentations_via_backtranslation(read_csv)
+    ml_input = read_csv[:10]
+    augmented_dataset = get_data_augmentations_via_backtranslation(ml_input)
     export_csv = augmented_dataset.to_csv(r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\ml_augmented.csv', index = False, header=True)
