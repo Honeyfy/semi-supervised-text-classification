@@ -1,7 +1,7 @@
 '''
-Compare editdistance between original and augmented text
+Compare editdistance  or set difference between original and augmented text
 '''
-# TODO 1.check edit distance - checked - 2.combine different senteces 3.create clean backtranslation function
+# TODO 1.check edit distance  maybe put tokens and compare- checked - 2.combine different sentences 3.create clean backtranslation function
 import editdistance
 import warnings
 import pandas as pd
@@ -33,20 +33,12 @@ def run_model_on_texts(file_path, project_id):
         run_on_entire_dataset=False)
 
 
-def print_evaluation_scores(y, y_pred):
-    precision = precision_score(y, y_pred)
-    recall = recall_score(y, y_pred)
-    f1 = f1_score(y, y_pred)
-    print("# # # # # # # # # MODEL SCORES ON EXTERNAL TEST DATA # # # # # # # # # # #\n"
-          " precision :{}   recall :{}    f1 :{}   on Test file".format(precision, recall, f1))
-
-
 def lower_remove_special_chars_and_split(in_string):  # remove special chars from string
     import re
     if in_string:
         lower_string = in_string.lower()
         # replace special chars with " "
-        clean_string = re.sub('[!#$-%:;(_)?.,]', ' ', lower_string)
+        clean_string = re.sub('([!&*#$-%:;(_)?.+,])+', ' ', lower_string)
         # split stirng on " "
         clean_string_split = clean_string.split(" ")
         # return list without " " items
@@ -60,6 +52,13 @@ def get_sentence_edit_distance(sent1, sent2):
     sent2_list_of_words = lower_remove_special_chars_and_split(sent2)
     return editdistance.eval(sent1_list_of_words, sent2_list_of_words)
 
+def get_sentence_token_difference(sent1, sent2):
+    sent1_list_of_words = lower_remove_special_chars_and_split(sent1)
+    sent2_list_of_words = lower_remove_special_chars_and_split(sent2)
+    set1 = set(sent1_list_of_words)
+    set2 = set(sent2_list_of_words)
+    return (len(set1-set2)+len(set2-set1))/2
+
 def load_model_from_file(model_id):
     data_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, 'data'))
     model_file = 'results\ml_model_' + str(model_id) + '.pickle'
@@ -68,13 +67,17 @@ def load_model_from_file(model_id):
     return clf
 
 
-def get_sentences_editdistance_list(text1, text2):  # takes 2 texts, sent toknize eace text, compare the sentences.
+def get_sentences_distance_list(text1, text2, editdistance=False):  # takes 2 texts, sent toknize eace text, compare the sentences.
     distances_list = []
     text1_sentences = sent_tokenize(text1)
     text2_sentences = sent_tokenize(text2)
     number_of_sentences = min(len(text1_sentences), len(text2_sentences))
     for sent_index in range(number_of_sentences):
-        distances_list.append(get_sentence_edit_distance(text1_sentences[sent_index], text2_sentences[sent_index]))
+        if editdistance:
+            distances_list.append(get_sentence_edit_distance(text1_sentences[sent_index], text2_sentences[sent_index]))
+        else:
+            distances_list.append(
+                get_sentence_token_difference(text1_sentences[sent_index], text2_sentences[sent_index]))
     if len(text1_sentences) != len(text2_sentences):
         # print("different number of sentences in text1: {} ,"
         # " and text2: {} is different input -1 to list".format(len(text1_sentences), len(text2_sentences)))
@@ -96,9 +99,8 @@ def compare_augmentation_df(data_frame, source1, source2):
                               axis=1, join='inner').reset_index()
     # compute editdistance
     comparison_df['editdistance'] = comparison_df.apply(
-        lambda x: get_sentences_editdistance_list(x[source1], x[source2]), axis=1)
+        lambda x: get_sentences_distance_list(x[source1], x[source2]), axis=1)
     return comparison_df
-
 
 def get_df_avg_distance(data_frame, source1, source2):
     comparison_df = compare_augmentation_df(data_frame, source1, source2)
