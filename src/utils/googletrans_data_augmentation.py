@@ -103,7 +103,7 @@ def chunk_texts_in_dataset(dataset, text_coulmn, char_limit):  # create llists w
     print("* Chunk {} |   last index in chunk is {}. Last chunk for this dataset".format(len(list_id_df), texts_index))
     # finished iteration over all instances. apply final chunk to df lists.
     last_text_index.append(
-        texts_index - 1)  # apply -1 so first instance in last chunk is not a duplicate of last instance in previous chunk
+        texts_index +1)  # apply +1 so first instance in last chunk is not a duplicate of last instance in previous chunk
     all_char_counter += char_counter
     list_id_df.append(doc_ids_chunk)
     list_text_df.append(texts_chunk)
@@ -134,7 +134,7 @@ def create_translation_df(dataset, text_column, translation_column, src_lang, de
             for x in list_text_df[i]:
                 char_counter += len(x)
             print("Sent {} characters to translation so far. ".format(char_counter))
-            chunk_translations = translate(list_text_df[i], src_lang, dest_lang)
+            chunk_translations = translate_test(list_text_df[i], src_lang, dest_lang)
             # add translations to temp df
             trans_df.insert(dataset.shape[1], translation_column, chunk_translations)
             # add translations to export df
@@ -167,7 +167,7 @@ def parse_df(dataset, text_column, char_limit):  # parse df to list of dfs
         # temp df
         partial_df = pd.DataFrame()
         # first index of chunk = last index in chunk - number of instances in chunk (last_text_index[i]) - len(list_id_df[i])
-        index_start_of_chunk = max(0, last_text_index[i] - len(list_id_df[i]))
+        index_start_of_chunk = max(0,last_text_index[i] - len(list_id_df[i]))
         # add chunk to temp_df
         partial_df = partial_df.append(dataset.iloc[index_start_of_chunk:last_text_index[i]])
         export_list.append(partial_df)
@@ -177,10 +177,9 @@ def parse_df(dataset, text_column, char_limit):  # parse df to list of dfs
     return export_list
 
 
-def check_if_texts_to_translate_in_column_text(texts_to_translate_in_column, datafram, user_input=0):
+def check_if_texts_to_translate_in_column_text(texts_to_translate_in_column, dataframe,daily_char_limit, chunk_to_translate=0):
     if texts_to_translate_in_column == 'text':
-        part = parse_df(read_csv, texts_to_translate_in_column, 140000)
-        chunk_to_translate = 0
+        part = parse_df(dataframe, texts_to_translate_in_column, daily_char_limit)
         try:
             user_input = int(chunk_to_translate)
         except ValueError:
@@ -194,25 +193,28 @@ def check_if_texts_to_translate_in_column_text(texts_to_translate_in_column, dat
             sys.exit(0)
     # else we have a chunk of data already  translated at least once. no need to split again :
     else:
-        part = [read_csv]
+        part = [dataframe]
         user_input = 0
         return part, user_input
 
-
 if __name__ == '__main__':
     # load dataset from csv to pandas DF
-    read_csv = pd.read_csv(r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\test_enron_en_de.csv')
-    # create a list of dataset. Each dataset has no more characters then daily translation limit.
-    texts_to_translate_in_column = 'de_trans'  # if 'text' insert chunk_number
+    read_csv = pd.read_csv(r'data.csv')
+    # choose in which column the text that need to be translated is
+    texts_to_translate_in_column = 'text'
+    daily_char_limit = 420000
     # if texts_to_translate_in_column == test => we are starting new translation:
-    part, part_index = check_if_texts_to_translate_in_column_text(texts_to_translate_in_column, read_csv, user_input=0)
-    # every day, run translation from src_lang to dest_lang on part[0]
+    #1. create a list of datasets. Each has no more characters then daily translation limit.
+    #2. translate 'text' from datset in position (chunk_to_translate) in list
+    #if texts_to_translate_in_column != test input is a chunk from previous run.
+    part, part_index = check_if_texts_to_translate_in_column_text(texts_to_translate_in_column, read_csv,daily_char_limit, chunk_to_translate=0)
+    # run translation
     translations_df = create_translation_df(
         dataset=part[part_index],
         text_column=texts_to_translate_in_column,
-        translation_column='de_bt',
-        src_lang='de',
-        dest_lang='en',
+        translation_column='fr_trans',
+        src_lang='en',
+        dest_lang='fr',
         char_limit=13000,
-        output_path=r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\test_enron_de_bt.csv',
+        output_path=r'data_fr_0.csv',
         resume=False)
