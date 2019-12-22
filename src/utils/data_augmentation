@@ -1,0 +1,53 @@
+import pandas as pd
+from googletrans import Translator
+
+def translate(origin, src, dest):
+    translator = Translator()
+    translates_obj = translator.translate(origin, src=src, dest=dest)
+    return translates_obj.text
+
+def back_trans_enfrde(origin):
+    origin_fr = translate(origin, 'en', 'fr')
+    origin_frde = translate(origin_fr, 'fr', 'de')
+    return translate(origin_frde, 'de', 'en')
+
+def back_trans_enfr(origin):
+    origin_fr = translate(origin, 'en', 'fr')
+    return translate(origin_fr, 'fr', 'en')
+
+def back_trans_enhe(origin):
+    origin_fr = translate(origin, 'en', 'he')
+    return translate(origin_fr, 'he', 'en')
+
+def back_trans_envi(origin):
+    origin_fr = translate(origin, 'en', 'vi')
+    return translate(origin_fr, 'vi', 'en')
+
+
+def create_translation_list(origin):
+    origin_list = [origin]
+    origin_list.append(back_trans_enfr(origin))
+    origin_list.append(back_trans_enfrde(origin))
+    origin_list.append(back_trans_enhe(origin))
+    origin_list.append(back_trans_envi(origin))
+    return origin_list
+
+# def create_translation_list_test(origin): #for when api is down
+#     origin_list = [origin]
+#     origin_list.append("1"+origin)
+#     origin_list.append("2"+origin)
+#     return origin_list
+
+def get_data_augmentations_via_backtranslation(data_frame): #augment text in column ['text']
+    return_df = data_frame.copy(deep=True)
+    return_df['text'] = [create_translation_list(x) for x in data_frame['text']]
+    return_df = return_df.explode('text').reset_index(drop= True)
+    #shuffle dataset before return
+    # return_df = return_df.sample(frac=1)
+    return return_df
+
+if __name__ == '__main__':
+    read_csv = pd.read_csv(r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\ml_input_labeled.csv')
+    ml_input = read_csv[:5]
+    augmented_dataset = get_data_augmentations_via_backtranslation(ml_input)
+    export_csv = augmented_dataset.to_csv(r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\ml_augmented1.csv', index = False, header=True)
