@@ -23,7 +23,7 @@ import numpy as np
 import spacy
 
 # global variables
-daily_char_limit = 4000000
+daily_char_limit = 400000
 trans_char_limit = 12800
 sleep_length = 600
 default_text_column = 'text'
