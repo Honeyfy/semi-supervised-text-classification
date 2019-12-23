@@ -1,17 +1,18 @@
 """ googletrans_augmentation.py create translations through googletrans library.
     Because of googletrans limitations on daily usage and maximum length per translation
-    DataFrame is split to parts according to daily_char_limit of specified column.
+    DataFrame is split to parts according to daily_char_limit of specified text column.
     The part chosen for translation is divided yet again to smaller bits (translation chunks) and sent for translation.
     translations are added to specified column and saved to new csv file.
+    When translation chain ends successfully a merged data file of translations and it's origins is created.
     Usage: run_translation_chain(
         data_path = path to csv file with columns 'text' and 'doc_id'
-        output_libary_path = where csv files with translations will be saved
-        tarnslation_codes = default set to : ['en','fr','de','en'], (https://py-googletrans.readthedocs.io/en/latest/)
+        output_library_path = where csv files with translations will be saved
+        translations_codes = default set to : ['en','fr','de','en'], (https://py-googletrans.readthedocs.io/en/latest/)
         start_chunk = what part of data will be translated)
 
      If translation fails during run:
      run again with code_position = last successful translation notice (['en','fr','de','en'] => [0 , 1 , 2 , 3 ])
-     maybe some data is saved in out_put_libary_path
+     Translated data is saved in out_put_library_path
         GoodLuck """
 
 import pandas as pd
@@ -20,12 +21,21 @@ import time
 import sys
 import numpy as np
 import spacy
+
 # global variables
 daily_char_limit = 400000
 trans_char_limit = 12800
-sleep_length = 300
+sleep_length = 600
 default_text_column = 'text'
 nlp = spacy.load("en_core_web_sm")
+
+
+## for testing #
+# def translate_test(origin, src, dest):  # for testing
+#     origin_list = [origin] if isinstance(origin, str) else origin
+#     translates_obj = origin_list
+#     translates_list = list(map(lambda x: dest+x, translates_obj))
+#     return translates_list
 
 
 def translate(origin, src, dest):
@@ -36,13 +46,6 @@ def translate(origin, src, dest):
     translates_obj = translator.translate(origin_list, src=src, dest=dest)
     # create a list texts from the objects returned by translator
     translates_list = list(map(lambda x: x.text, translates_obj))
-    return translates_list
-
-
-def translate_test(origin, src, dest):  # for testing without real translation
-    origin_list = [origin] if isinstance(origin, str) else origin
-    translates_obj = origin_list
-    translates_list = list(map(lambda x: dest+x, translates_obj))
     return translates_list
 
 
@@ -97,17 +100,11 @@ def chunk_texts_in_dataset(dataset, text_column, char_limit):  # create lists wi
 
 
 def create_translation_df(dataset, text_column, translation_column, src_lang, dest_lang, char_limit, output_path,
-                          char_counter=0,
-                          resume=False):
+                          char_counter=0):
     export_df = pd.DataFrame()
     # split data to chunks no longer then char_limit
     list_id_df, list_text_df = chunk_texts_in_dataset(dataset, text_column, char_limit)
-    # check if resuming previous translation
-    if resume:
-        start_at_chunk = resume
-        export_df = pd.read_csv(output_path)
-    else:
-        start_at_chunk = 0
+    start_at_chunk = 0
     for i in range(start_at_chunk, len(list_id_df)):
         try:
             # initialize a temp df with doc_ids
@@ -159,39 +156,6 @@ def get_ds_for_translation(data_path, wanted_chunk_size, start_chunk):
     return ds_for_translation, len(ds_for_translation_chunks) - 1
 
 
-def run_translation_chain(data_path, output_libary_path, tarnslation_codes, start_chunk, code_postion=0):
-    # get wanted chunk size to complete one translation chain in less then daily_char_limit
-    wanted_chunk_size = get_wanted_chunk_size(tarnslation_codes[1:])
-    print("splitting data to chunks with length of {} characters".format(wanted_chunk_size))
-    ds_for_translation, index_last_chunk = get_ds_for_translation(data_path, wanted_chunk_size, start_chunk)
-    print("data was split to {} chunks. translating part {}".format(index_last_chunk, start_chunk))
-    ds_origin = ds_for_translation.copy(deep=True)
-    trans_path = default_text_column
-    char_counter = 0
-    # prepare variables and data to continue an incomplete previous translation chain
-    if code_postion:
-        for i, trans_code in enumerate(tarnslation_codes[1:code_postion + 1], 1):
-            new_trans_path = trans_path + "_" + trans_code
-            output_path = output_libary_path + new_trans_path + str(start_chunk) + ".csv"
-            ds_for_translation = pd.read_csv(output_path)
-            trans_path = new_trans_path
-    for i, trans_code in enumerate(tarnslation_codes[code_postion + 1:], code_postion + 1):
-        new_trans_path = trans_path + "_" + trans_code
-        output_path = output_libary_path + new_trans_path + str(start_chunk) + ".csv"
-        generated_translations, char_counter = create_translation_df(ds_for_translation, trans_path, new_trans_path,
-                                                                     tarnslation_codes[i - 1], trans_code,
-                                                                     trans_char_limit, output_path,
-                                                                     char_counter, resume=False)
-        ds_for_translation = generated_translations
-        trans_path = new_trans_path
-        time.sleep(sleep_length)
-    merged_back_translated_data_set = merge_back_translations_with_origin(ds_for_translation, trans_path, ds_origin)
-    export_csv = merged_back_translated_data_set.to_csv(
-        output_libary_path + trans_path + str(start_chunk) + "_merged_with_origin.csv", index=False, header=True)
-    print("Index of last chunk is {}. Translation of chunk {} ended succecfuly".format(index_last_chunk, start_chunk))
-    return ds_for_translation, merged_back_translated_data_set
-
-
 def merge_back_translations_with_origin(ds_translations, trans_path, ds_origin):
     ds_origins_of_translations = ds_origin.loc[ds_origin['document_id'].isin(ds_translations['document_id'])]
     ds_translations_with_origin_columns = ds_origins_of_translations.join(ds_translations.set_index('document_id'),
@@ -205,10 +169,46 @@ def merge_back_translations_with_origin(ds_translations, trans_path, ds_origin):
     return merged_backtranslations
 
 
+def run_translation_chain(data_path, output_library_path, translation_codes, start_chunk, code_postion=0):
+    # get wanted chunk size to complete one translation chain in less then daily_char_limit
+    wanted_chunk_size = get_wanted_chunk_size(translation_codes[1:])
+    print("splitting data to chunks with length of {} characters".format(wanted_chunk_size))
+    ds_for_translation, index_last_chunk = get_ds_for_translation(data_path, wanted_chunk_size, start_chunk)
+    print("data was split to {} chunks. translating part {}".format(index_last_chunk, start_chunk))
+    ds_origin = ds_for_translation.copy(deep=True)
+    trans_path = default_text_column
+    char_counter = 0
+    # prepare variables and data to continue an incomplete previous translation chain
+    if code_postion:
+        for i, trans_code in enumerate(translation_codes[1:code_postion + 1], 1):
+            new_trans_path = trans_path + "_" + trans_code
+            output_path = output_library_path + new_trans_path + str(start_chunk) + ".csv"
+            ds_for_translation = pd.read_csv(output_path)
+            trans_path = new_trans_path
+    # start translation chain
+    for i, trans_code in enumerate(translation_codes[code_postion + 1:], code_postion + 1):
+        new_trans_path = trans_path + "_" + trans_code
+        output_path = output_library_path + new_trans_path + str(start_chunk) + ".csv"
+        generated_translations, char_counter = create_translation_df(ds_for_translation, trans_path,
+                                                                     new_trans_path, translation_codes[i - 1],
+                                                                     trans_code, trans_char_limit, output_path,
+                                                                     char_counter)
+        ds_for_translation = generated_translations
+        trans_path = new_trans_path
+        # sleep between backtranskations
+        time.sleep(sleep_length)
+    # create a dataset with translations and it's origins
+    merged_back_translated_data_set = merge_back_translations_with_origin(ds_for_translation, trans_path, ds_origin)
+    export_csv = merged_back_translated_data_set.to_csv(
+        output_library_path + trans_path + str(start_chunk) + "_merged_with_origin.csv", index=False, header=True)
+    print("Index of last chunk is {}. Translation of chunk {} ended successfully".format(index_last_chunk, start_chunk))
+    return ds_for_translation, merged_back_translated_data_set
+
+
 if __name__ == '__main__':
     translated_texts, merged_translations = run_translation_chain(
-        data_path=r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\tests\data.csv',
-        output_libary_path=r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\tests\\',
-        tarnslation_codes=['en', 'fr', 'de', 'en'],
+        data_path=r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\tests\real_aug\data.csv',
+        output_library_path=r'C:\Users\Roy\Documents\semi-supervised-text-classification\data\tests\real_aug\\',
+        translation_codes=['en', 'fr', 'de', 'en'],
         start_chunk=0,
         code_postion=0)
