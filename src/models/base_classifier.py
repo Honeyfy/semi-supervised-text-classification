@@ -108,7 +108,6 @@ class BaseClassifier:
         # warn if label appears, and about set difference between columns
         if self.columns_ is not None:
             if not set(self.columns_) == set(X.columns):
-                print(set(X.columns).symmetric_difference(set(self.columns_)))
                 raise ValueError('Mismatched columns in transform. Expected %r, got %r' % (self.columns_, X.columns))
             X = X[self.columns_]
         return self._model.predict(X)
