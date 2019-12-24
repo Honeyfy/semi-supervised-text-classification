@@ -197,7 +197,7 @@ def run_translation_chain(data_path, output_library_path, translation_codes, sta
         trans_path = new_trans_path
         # sleep between backtranslations unless last translation
         if i != len(translation_codes[code_position + 1:]):
-            print("sleep i = ", i, "code_position = ", len(translation_codes[code_position + 1:]))
+            print("Finished translation to: ", code_position, ". Sleep for : ", sleep_length, "seconds.")
             time.sleep(sleep_length)
     # create a dataset with translations and it's origins
     merged_back_translated_data_set = merge_back_translations_with_origin(ds_for_translation, trans_path, ds_origin)
