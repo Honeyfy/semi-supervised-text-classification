@@ -82,8 +82,9 @@ class BootstrapClassifier(BaseClassifier):
     def set_preprocessor(self, pipeline):
         self.processing_pipeline = TextPipeline(pipeline)
 
-    def run_on_train_test(self, X_train_in, X_test_in, y_train_in, y_test_in, output_filename, user_id, project_id, label_id=None,
-                    pipeline=None, bootstrap_iterations=0, bootstrap_threshold=0.9, run_on_entire_dataset=False):
+    def run_on_train_test(self, df, X_train_in, X_test_in, y_train_in, y_test_in, output_filename, user_id, project_id,
+                          label_id=None, pipeline=None, bootstrap_iterations=0, bootstrap_threshold=0.9,
+                          run_on_entire_dataset=False):
 
         output_filename = os.path.abspath(output_filename)
         output_folder = os.path.join(os.path.dirname(output_filename), 'results')
@@ -93,54 +94,61 @@ class BootstrapClassifier(BaseClassifier):
         print('Reading input file...')
 
         label_field = 'label_id'
-        #concat train test split to single dataframe
-        X_train_in.insert(X_train_in.shape[1],label_field,y_train_in)
-        X_test_in.insert(X_test_in.shape[1],label_field,y_test_in)
-        df = pd.concat((X_train_in, X_test_in))
-
-        if 'label_id' in df.columns:
-            df['label'] = df['label_id']
-
-        elif 'label' not in df.columns:
-            raise ValueError("no columns 'label' or 'label_id' exist in input dataframe")
-
-        df = df[~pd.isnull(df['text'])]
-
-        df.loc[:, label_field] = df[label_field].apply(lambda x: str(x) if not pd.isnull(x) else x)
-        df.loc[df[label_field] == ' ', label_field] = None
-
-        if label_id:
-            df_labeled = df[df[label_field] == label_id]
-            df_labeled = pd.concat([df_labeled, df[df[label_field] != label_id].sample(df_labeled.shape[0])])
-            df_labeled.loc[df_labeled[label_field] != label_id, label_field] = 0
-            df_labeled = df_labeled[(~pd.isnull(df_labeled[label_field])) & (df_labeled[label_field] != ' ')]
-        else:
-            df_labeled = df[(~pd.isnull(df[label_field]))]
-
-        print('Pre-processing text and extracting features...')
         self.set_preprocessor(pipeline)
-        train_set = df_labeled.loc[df_labeled['document_id'].isin(X_train_in['document_id'])]
-        test_set = df_labeled.loc[df_labeled['document_id'].isin(X_test_in['document_id'])]
-        train_preprocessed = self.pre_process(train_set, fit=True)
-        test_preprocessed = self.pre_process(test_set, fit=False)
 
-        if label_field not in train_set.columns:
-            raise RuntimeError("column '{}' not found".format(label_field))
-        else:
-            y_train = train_set[label_field].values
-            y_test = test_set[label_field].values
+        # # concat train test split to single dataframe
+        # X_train_in.insert(X_train_in.shape[1], label_field, y_train_in)
+        # X_test_in.insert(X_test_in.shape[1], label_field, y_test_in)
+        # df = pd.concat((X_train_in, X_test_in))
+        # print("X_train_in {}".format(X_train_in.shape))
+        # print("X_test_in {}".format(X_test_in.shape))
+        # print("df {}".format(df.shape))
+        #
+        # if 'label_id' in df.columns:
+        #     df['label'] = df['label_id']
+        #
+        # elif 'label' not in df.columns:
+        #     raise ValueError("no columns 'label' or 'label_id' exist in input dataframe")
+        #
+        # df = df[~pd.isnull(df['text'])]
+        # print("df {}".format(df.shape))
+        #
+        # df.loc[:, label_field] = df[label_field].apply(lambda x: str(x) if not pd.isnull(x) else x)
+        # df.loc[df[label_field] == ' ', label_field] = None
+        #
+        # if label_id:
+        #     df_labeled = df[df[label_field] == label_id]
+        #     df_labeled = pd.concat([df_labeled, df[df[label_field] != label_id].sample(df_labeled.shape[0])])
+        #     df_labeled.loc[df_labeled[label_field] != label_id, label_field] = 0
+        #     df_labeled = df_labeled[(~pd.isnull(df_labeled[label_field])) & (df_labeled[label_field] != ' ')]
+        # else:
+        #     df_labeled = df[(~pd.isnull(df[label_field]))]
+        # print("df_labeled {}".format(df_labeled.shape))
+        # print('Pre-processing text and extracting features...')
+        # self.set_preprocessor(pipeline)
+        # train_set = df_labeled.loc[df_labeled['document_id'].isin(X_train_in['document_id'])]
+        # test_set = df_labeled.loc[df_labeled['document_id'].isin(X_test_in['document_id'])]
 
-        X_train = train_preprocessed
-        X_test = test_preprocessed
+        train_preprocessed = self.pre_process(X_train_in, fit=True)
+        test_preprocessed = self.pre_process(X_test_in, fit=False)
+
+        # if label_field not in X_train_in.columns:
+        #     raise RuntimeError("column '{}' not found".format(label_field))
+        # else:
+        #     y_train = X_train_in[label_field].values
+        #     y_test = X_test_in[label_field].values
+
+        X_train = train_preprocessed.copy()
+        X_test = test_preprocessed.copy()
         print('Training the model...')
-        self.fit(X_train, y_train)
+        self.fit(X_train, y_train_in)
 
         print('Performance on train set:')
-        _, evaluation_text = self.evaluate(X_train, y_train)
+        _, evaluation_text = self.evaluate(X_train, y_train_in)
         result = 'Performance on train set: \n' + evaluation_text
 
         print('Performance on test set:')
-        _, evaluation_text = self.evaluate(X_test, y_test)
+        _, evaluation_text = self.evaluate(X_test, y_test_in)
         result = result + '\nPerformance on test set: \n' + evaluation_text
 
         df_gold_labels = df[df['user_id'] == 'gold_label']
@@ -225,12 +233,12 @@ class BootstrapClassifier(BaseClassifier):
         # Confusion matrix
         print('Generating confusion matrix...')
         from src.utils.analyze_model import plot_confusion_matrix
-        fig = plot_confusion_matrix(y_test, y_test_pred, classes=None, normalize=True, title='Normalized confusion matrix - test')
+        fig = plot_confusion_matrix(y_test_in, y_test_pred, classes=None, normalize=True, title='Normalized confusion matrix - test')
         filename = os.path.join(output_folder, 'confusion_matrix_test_{}.png'.format(project_id))
         fig.savefig(filename)
         plt.clf()
 
-        fig = plot_confusion_matrix(y_train, self.predict(X_train), classes=None, normalize=True, title='Normalized confusion matrix - train')
+        fig = plot_confusion_matrix(y_train_in, self.predict(X_train), classes=None, normalize=True, title='Normalized confusion matrix - train')
         filename = os.path.join(output_folder, 'confusion_matrix_train_{}.png'.format(project_id))
         fig.savefig(filename)
         plt.clf()
@@ -238,7 +246,7 @@ class BootstrapClassifier(BaseClassifier):
         # Precision-recall curve
         print('Generating the Precision-Recall graph...')
         try:
-            fig = plot_precision_recall_curve(y_test_pred_proba, y_test)
+            fig = plot_precision_recall_curve(y_test_pred_proba, y_test_in)
             filename = os.path.join(output_folder, 'precision_recall_curve_{}.png'.format(project_id))
             fig.savefig(filename)
             plt.clf()
@@ -248,7 +256,7 @@ class BootstrapClassifier(BaseClassifier):
         # ROC curve
         print('Generating ROC curve...')
         try:
-            fig = plot_roc_curve(y_test_pred_proba, y_test)
+            fig = plot_roc_curve(y_test_pred_proba, y_test_in)
             filename = os.path.join(output_folder, 'roc_curve_{}.png'.format(project_id))
             fig.savefig(filename)
             plt.clf()
@@ -258,7 +266,7 @@ class BootstrapClassifier(BaseClassifier):
         # Confidence-accuracy graph
         print('Generating the Confidence-Accuracy graph...')
         try:
-            fig = plot_confidence_performance(y_test_pred, y_test_pred_proba, y_test)
+            fig = plot_confidence_performance(y_test_pred, y_test_pred_proba, y_test_in)
             filename = os.path.join(output_folder, 'confidence_accuracy_graph_{}.png'.format(project_id))
             fig.savefig(filename)
             plt.clf()
@@ -279,14 +287,14 @@ class BootstrapClassifier(BaseClassifier):
         # Generating learning curve
         print('Generating the learning curve...')
         from src.utils.analyze_model import plot_learning_curve_cv
-        fig = plot_learning_curve_cv(X_train, y_train, estimator=self._model)
+        fig = plot_learning_curve_cv(X_train, y_train_in, estimator=self._model)
         filename = os.path.join(output_folder, 'learning_curve_{}.png'.format(project_id))
         fig.savefig(filename)
         plt.clf()
 
-        # Run FastText for text classification
-        df_labeled_train = df_labeled.loc[X_train.index, :]
-        df_labeled_test = df_labeled.loc[X_test.index, :]
+        # # Run FastText for text classification
+        df_labeled_train = df.loc[X_train.index, :]
+        df_labeled_test = df.loc[X_test.index, :]
 
         if RUN_FASTTEXT:
             try:
@@ -329,8 +337,10 @@ def run_model_on_file(input_filename, output_filename, user_id, project_id, labe
                              pipeline=pipeline, run_on_entire_dataset=run_on_entire_dataset)
     return result
 
-def run_model_on_train_test_split(X_train, X_test, y_train, y_test, output_filename, user_id, project_id, label_id=None, method='bow', run_on_entire_dataset=False):
-    model = LogisticRegression(verbose=False, class_weight='balanced', random_state=0, penalty='l1', C= 1, solver='liblinear', multi_class='ovr')
+
+def run_model_on_train_test_split(df, X_train, X_test, y_train, y_test, output_filename, user_id, project_id,
+                                  C= 1, label_id=None, method='bow', run_on_entire_dataset=False):
+    model = LogisticRegression(verbose=False, class_weight=None, random_state=0, penalty='l1', C=C, solver='liblinear', multi_class='ovr')
     clf = BootstrapClassifier(model=model)
     # pipeline functions are applied sequentially by order of appearance
     pipeline = [('base processing', {'col': 'text', 'new_col': 'processed_text'}),
@@ -340,26 +350,26 @@ def run_model_on_train_test_split(X_train, X_test, y_train, y_test, output_filen
                                   'stop_words': 'english', 'strip_accents': 'ascii', 'max_features': 5000}),
                 ('drop columns', {'drop_cols': ['label_id', 'text', 'processed_text', 'index', 'source']})]
 
-    result = clf.run_on_train_test(X_train, X_test, y_train, y_test, output_filename, user_id, project_id, label_id,
-                             pipeline=pipeline, run_on_entire_dataset=run_on_entire_dataset)
+    result = clf.run_on_train_test(df, X_train, X_test, y_train, y_test, output_filename, user_id, project_id, label_id,
+                                   pipeline=pipeline, run_on_entire_dataset=run_on_entire_dataset)
     return result, clf
 
 if __name__ == '__main__':
     data_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, 'data'))
-    input_file = os.path.join(data_path,r'ml_input_labeled.csv')
-    output_file = os.path.join(data_path, 'output.csv')
+    input_file = os.path.join(data_path,'new_data_0030_roy.csv')
+    output_file = os.path.join(data_path, 'try_output.csv')
     data = pd.read_csv(input_file)
     label_column_name = "label_id"
     data_column_names = list(data.columns.values)
     data_column_names.remove(label_column_name)
-    X_train, X_test, y_train, y_test = train_test_split(data[data_column_names],data[label_column_name],test_size=0.25)
+    X_train, X_test, y_train, y_test = train_test_split(data[data_column_names], data[label_column_name], test_size=0.25)
     y_train = y_train.astype(str)
     y_test = y_test.astype(str)
     result, bootstrap_clf = run_model_on_train_test_split(
         X_train, X_test, y_train, y_test,
-        output_filename =output_file,
-        user_id = 2,
-        project_id = 999,
+        output_filename=output_file,
+        user_id=2,
+        project_id=998,
         label_id=None,
         method='bow',
         run_on_entire_dataset=False)
