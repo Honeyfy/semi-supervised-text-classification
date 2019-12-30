@@ -3,7 +3,8 @@ import pandas as pd
 from src.models.text_classifier import TextClassifier
 import numpy as np
 
-def get_conf_labels(trained_model,par_text_df, min_confidence, user_id, include_zeros=True):
+
+def get_conf_labels(trained_model,par_text_df, min_confidence, user_id):
     one_string = ''       #TODO what hapens when b<1?
     clf = trained_model
     pred_df = par_text_df.copy()
@@ -24,7 +25,6 @@ def get_conf_labels(trained_model,par_text_df, min_confidence, user_id, include_
         new_labels_df.drop('confidence', axis=1, inplace=True)
         new_labels_df['user_id'] = user_id
         new_labels_df = new_labels_df[['document_id', 'label_id', 'text', 'user_id']]
-
 
     return new_labels_df
 

@@ -61,7 +61,7 @@ if __name__ == '__main__':
         if mails_remain<=mails_num:
             mails_num = mails_remain
 
-        par_data = get_par_data(data_path,model_path,true_data,name,min_confidence,mails_num,user_id)
+        par_data = get_par_data(data_path,model_path,true_data,model_name,min_confidence,mails_num,user_id)
 
         if i==0:
             full_par_data = par_data

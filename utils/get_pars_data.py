@@ -44,8 +44,6 @@ def get_par_data(data_path,model_path,true_data,name,min_confidence,mails_num,us
     trained_model_path = model_path + name + '.pickle'
     trained_model = TextClassifier.load(trained_model_path)
 
-
-
     true_par_sample, mail_id = get_rand_mail(true_data, mails_num)
     mail_id=np.unique(mail_id)
     #df = df[df['Column Name'].isin(['Value']) == False]
